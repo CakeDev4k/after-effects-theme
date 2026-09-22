@@ -700,6 +700,65 @@ static void TestColorHookCounting() {
 }
 
 /*
+    The popup swatches took a SkinSetProvider* in After Effects 26.3. Either
+    name is found, the six arguments reach the draw in order, and it runs
+    inside a content scope.
+*/
+static uintptr_t g_swatchArgs[6];
+static int g_swatchDepth = -1;
+
+static void FakeSwatchDraw(uintptr_t a, uintptr_t b, uintptr_t c, uintptr_t d,
+                           uintptr_t e, uintptr_t f) {
+    const uintptr_t args[] = {a, b, c, d, e, f};
+    std::memcpy(g_swatchArgs, args, sizeof(args));
+    g_swatchDepth = g_contentDepth;
+}
+
+static int InstallContentHooksFrom(std::vector<const char*> exports) {
+    g_fakeExports = std::move(exports);
+    g_absentLogs = 0;
+    g_lastAbsent = nullptr;
+
+    InstallContentHooksImpl(kFakeDvaui, std::make_index_sequence<kContentDrawCount>{});
+    g_fakeExports.clear();
+    return g_absentLogs;
+}
+
+static void TestContentDrawNames() {
+    std::vector<const char*> newer, older;
+
+    for (const ColorSymbol& sym : kContentDraws) {
+        newer.push_back(sym.mangled);
+        older.push_back(sym.before2026 ? sym.before2026 : sym.mangled);
+    }
+
+    CHECK(kContentDrawCount == 5);
+
+    for (size_t popup : {size_t{3}, size_t{4}}) {
+        const ColorSymbol& sym = kContentDraws[popup];
+
+        CHECK(std::strstr(sym.mangled, "PEBVSkinSetProvider@") != nullptr);
+        CHECK(sym.before2026 && !std::strstr(sym.before2026, "SkinSetProvider"));
+    }
+
+    CHECK(InstallContentHooksFrom(newer) == 0);  // 26.3
+    CHECK(InstallContentHooksFrom(older) == 0);  // the builds before it
+
+    // Under neither name: each is reported once, by its label.
+    CHECK(InstallContentHooksFrom({newer.begin(), newer.begin() + 3}) == 2);
+    CHECK(g_lastAbsent && wcscmp(g_lastAbsent, L"V6PopupSkin::DrawColorSwatch") == 0);
+
+    ContentDrawHook<3>::original = FakeSwatchDraw;
+    ContentDrawHook<3>::Hook(11, 22, 33, 44, 55, 66);
+    ContentDrawHook<3>::original = nullptr;
+
+    const uintptr_t expected[] = {11, 22, 33, 44, 55, 66};
+    CHECK(std::memcmp(g_swatchArgs, expected, sizeof(expected)) == 0);
+    CHECK(g_swatchDepth == 1);
+    CHECK(g_contentDepth == 0);
+}
+
+/*
     A build that does not ship dvaui.dll: the toolkit is looked for by symbol
     instead. Premiere 2026 exports ui::GetGrayColor from dvaworkspace.dll as
     well, and that module carries 11 of the 26 functions and paints none of
@@ -1894,7 +1953,8 @@ static void TestScriptCss() {
         "f={\"background-color\":\"rgb(37, 37, 37)\"};"
         "g=o.createElement(\"path\",{fill:\"#2c2c2c\",stroke:\"#231f20\"});"
         "k={style:{backgroundColor:\"#1e1e1e\"}};"
-        "m=`rgb(${r}, ${g}, ${b})`;";
+        "m=`rgb(${r}, ${g}, ${b})`;"
+        "q.setRgb(18, 18, 18);u=toRgba(20, 20, 20, 1);";
     const std::string original = js;
 
     size_t n = RecolorScript(js, original.size());
@@ -1918,8 +1978,9 @@ static void TestScriptCss() {
     CHECK(s.find("backgroundColor:\"" + Hex(Convert8(RGB(0x1E, 0x1E, 0x1E)), false)) !=
           std::string::npos);
 
-    // A template that builds a color is not one.
+    // A template that builds a color is not one, and neither is a call.
     CHECK(s.find("`rgb(${r}, ${g}, ${b})`") != std::string::npos);
+    CHECK(s.find("q.setRgb(18, 18, 18);u=toRgba(20, 20, 20, 1);") != std::string::npos);
 
     CHECK(n == 5);
 
@@ -2260,6 +2321,7 @@ int main() {
     TestGdiOrder();
     TestGdiMatchesOldFormula();
     TestColorHookCounting();
+    TestContentDrawNames();
     TestColorModuleSearch();
     TestMenuTextOptions();
     TestMenuBarGate();

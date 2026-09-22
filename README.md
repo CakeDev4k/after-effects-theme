@@ -11,6 +11,10 @@ Premiere are built on the same Adobe UI toolkit, `dvaui.dll`, so a palette
 lands on both the same way. The custom theme has the same fields, less
 Premiere's Monitor background.
 
+The two mods are one codebase kept as two, so that each app has a palette and
+switches of its own in Windhawk. A fix to the code they share goes into both,
+so a bug reported against either is worth checking in the other.
+
 ![After Effects with the Violet palette](screenshots/violet.png)
 
 ## Palettes

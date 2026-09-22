@@ -11,8 +11,8 @@ the Windhawk API stubbed out. They cover:
   design tokens in the panel's own script, including that an icon stroke and a
   loose string beside them are left alone by that pass; and the stylesheet
   text a script or a webview page carries — injected rules, a theme's table of
-  backgrounds — taken while an icon's own hex stays as it is and a token is
-  converted once;
+  backgrounds — taken while an icon's own hex stays as it is, a call such as
+  `setRgb(18, 18, 18)` is not a color, and a token is converted once;
 - the file redirect on real temporary files, for a stylesheet and for a script,
   including that the copy carries the extension of the file it stands in for,
   and that only files under After Effects' own `Support Files\UXP\plugins`
@@ -30,7 +30,9 @@ the Windhawk API stubbed out. They cover:
 - which windows the frame work is spent on: top level, and with a frame;
 - the menu theme bookkeeping;
 - how the renamed dvaui functions are counted, and how a renamed dvaui is
-  found by its exports.
+  found by its exports;
+- the popup swatches under either of their names, the six arguments 26.3 gives
+  them passed through in order, inside a content scope.
 
 Run them from the repository root, with Windhawk and PowerShell 7 installed:
 
