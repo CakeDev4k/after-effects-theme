@@ -1,0 +1,7 @@
+# Windhawk build output
+*.o
+*.dll
+*.pdb
+
+# Scratch halves of the editing helper, never part of the mod.
+[on][0-9]*.txt
